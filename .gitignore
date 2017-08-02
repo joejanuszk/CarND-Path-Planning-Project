@@ -1,0 +1,10 @@
+# silly macOS
+.DS_Store
+
+# build files
+build/
+
+*.swp
+*.swo
+
+term3_sim_linux/
