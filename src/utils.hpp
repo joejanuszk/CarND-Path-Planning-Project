@@ -18,6 +18,15 @@ constexpr double timestep() { return 0.02; }
 // In meters / second^2
 constexpr double max_safe_acceleration() { return 9.81; }
 
+// 1 m/s in mph
+const double METERS_PER_SEC_IN_MPH = 2.23694;
+
+double ms2mph(double x) { return x * METERS_PER_SEC_IN_MPH; }
+double mph2ms(double x) { return x / METERS_PER_SEC_IN_MPH; }
+
+const double SPEED_LIMIT_MPH = 50;
+const double SPEED_LIMIT_MS = mph2ms(SPEED_LIMIT_MPH);
+
 struct CarState {
     double x;
     double y;
@@ -46,11 +55,14 @@ CarState getNextMaxSafeForwardCarState(const CarState &cs) {
     double y_frac = sin(yaw_r);
 
     double dxy = getDisplacementInTime(cs.v, a, t);
+    double v2 = dxy / t;
+    if (v2 >= SPEED_LIMIT_MS) {
+        v2 = cs.v;
+        dxy = getDisplacementInTime(v2, 0, t);
+    }
 
     double x2 = cs.x + dxy * x_frac;
     double y2 = cs.y + dxy * y_frac;
-
-    double v2 = dxy / t;
 
     return { x2, y2, v2, cs.yaw };
 }
