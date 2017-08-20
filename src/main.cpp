@@ -8,16 +8,12 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
+#include "utils.hpp"
 
 using namespace std;
 
 // for convenience
 using json = nlohmann::json;
-
-// For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-double deg2rad(double x) { return x * pi() / 180; }
-double rad2deg(double x) { return x * 180 / pi(); }
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -34,10 +30,6 @@ string hasData(string s) {
   return "";
 }
 
-double distance(double x1, double y1, double x2, double y2)
-{
-	return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
-}
 int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> maps_y)
 {
 
@@ -238,6 +230,36 @@ int main() {
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
 
+            double path_size = previous_path_x.size();
+            double pos_x;
+            double pos_y;
+            double v;
+            for (int i = 0; i < path_size; ++i) {
+                next_x_vals.push_back(previous_path_x[i]);
+                next_y_vals.push_back(previous_path_y[i]);
+            }
+
+            if (path_size == 0) {
+                pos_x = car_x;
+                pos_y = car_y;
+                v = car_speed;
+            }
+            else {
+                pos_x = previous_path_x[path_size - 1];
+                pos_y = previous_path_y[path_size - 1];
+
+                double pos_x2 = previous_path_x[path_size - 2];
+                double pos_y2 = previous_path_y[path_size - 2];
+                double prev_dist = distance(pos_x2, pos_y2, pos_x, pos_y);
+                v = prev_dist / timestep();
+            }
+
+            CarState cs_loop = { pos_x, pos_y, v, car_yaw };
+            for (int i = 0; i < 50 - path_size; ++i) {
+                cs_loop = getNextMaxSafeForwardCarState(cs_loop);
+                next_x_vals.push_back(cs_loop.x);
+                next_y_vals.push_back(cs_loop.y);
+            }
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
           	msgJson["next_x"] = next_x_vals;
