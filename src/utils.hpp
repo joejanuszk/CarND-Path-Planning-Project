@@ -17,7 +17,9 @@ const double METERS_PER_SEC_IN_MPH = 2.23694;
 double ms2mph(double x) { return x * METERS_PER_SEC_IN_MPH; }
 double mph2ms(double x) { return x / METERS_PER_SEC_IN_MPH; }
 
-const double SPEED_LIMIT_MPH = 50;
+const double TRACK_LENGTH_M = 6945.554;
+const double SPEED_LIMIT_BUFFER_MPH = 0.5;
+const double SPEED_LIMIT_MPH = 50 - SPEED_LIMIT_BUFFER_MPH;
 const double SPEED_LIMIT_MS = mph2ms(SPEED_LIMIT_MPH);
 
 struct CarStateXY {
@@ -27,14 +29,29 @@ struct CarStateXY {
     double yaw;
 };
 
+struct CarStateFrenet {
+    double s;
+    double d;
+    double v;
+    double yaw;
+};
+
 double getDisplacementInTime(double v, double a, double t) {
     return (v * t) + (a * t * t);
 }
 
-void printCarState(const CarStateXY &cs) {
+void printCarStateXY(const CarStateXY &cs) {
     cout << "CarStateXY:\n";
     cout << "\tx: " << cs.x << "\n";
     cout << "\ty: " << cs.y << "\n";
+    cout << "\tv: " << cs.v << "\n";
+    cout << "\tyaw: " << cs.yaw << "\n";
+}
+
+void printCarStateFrenet(const CarStateFrenet &cs) {
+    cout << "CarStateFrenet:\n";
+    cout << "\ts: " << cs.s << "\n";
+    cout << "\td: " << cs.d << "\n";
     cout << "\tv: " << cs.v << "\n";
     cout << "\tyaw: " << cs.yaw << "\n";
 }
@@ -58,6 +75,29 @@ CarStateXY getNextMaxSafeForwardCarStateXY(const CarStateXY &cs) {
     double y2 = cs.y + dxy * y_frac;
 
     return { x2, y2, v2, cs.yaw };
+}
+
+double getSmallestFrenetS(double s) {
+    while (s > TRACK_LENGTH_M) {
+        s -= TRACK_LENGTH_M;
+    }
+    return s;
+}
+
+CarStateFrenet getNextMaxSafeForwardCarStateFrenet(const CarStateFrenet &cs) {
+    double t = timestep();
+    double a = max_safe_acceleration();
+
+    double disp = getDisplacementInTime(cs.v, a, t);
+    double v2 = disp / t;
+    if (v2 >= SPEED_LIMIT_MS) {
+        v2 = cs.v;
+        disp = getDisplacementInTime(v2, 0, t);
+    }
+
+    double s = getSmallestFrenetS(cs.s + disp);
+
+    return { s, cs.d, v2, cs.yaw };
 }
 
 vector<double> getCarXYPointFromGlobalXYPoint(double car_x, double car_y, double yaw, double global_x, double global_y) {
@@ -111,4 +151,21 @@ tk::spline getSplineFromNearbyWaypoints(
     waypoints_spline.set_points(car_waypoints_x, car_waypoints_y);
 
     return waypoints_spline;
+}
+
+CarStateFrenet getCarStateFrenet(
+        const CarStateXY &cs,
+        const vector<double> &maps_x,
+        const vector<double> &maps_y) {
+    vector<double> frenet = getFrenet(cs.x, cs.y, cs.yaw, maps_x, maps_y);
+    return { frenet[0], frenet[1], cs.v, cs.yaw };
+}
+
+CarStateXY getCarStateXY(
+        const CarStateFrenet &cs,
+        const vector<double> &maps_s,
+        const vector<double> &maps_x,
+        const vector<double> &maps_y) {
+    vector<double> xy = getXY(cs.s, cs.d, maps_s, maps_x, maps_y);
+    return { xy[0], xy[1], cs.v, cs.yaw };
 }

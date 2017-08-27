@@ -112,32 +112,40 @@ int main() {
             double path_size = previous_path_x.size();
             double pos_x;
             double pos_y;
+            double pos_s;
+            double yaw;
             double v;
             for (int i = 0; i < path_size; ++i) {
                 next_x_vals.push_back(previous_path_x[i]);
                 next_y_vals.push_back(previous_path_y[i]);
             }
 
-            if (path_size == 0) {
+            if (path_size < 2) {
                 pos_x = car_x;
                 pos_y = car_y;
+                pos_s = car_s;
+                yaw = car_yaw;
                 v = car_speed;
             }
             else {
                 pos_x = previous_path_x[path_size - 1];
                 pos_y = previous_path_y[path_size - 1];
-
                 double pos_x2 = previous_path_x[path_size - 2];
                 double pos_y2 = previous_path_y[path_size - 2];
                 double prev_dist = distance(pos_x2, pos_y2, pos_x, pos_y);
+                yaw = rad2deg(atan2(pos_y - pos_y2, pos_x - pos_x2));
                 v = prev_dist / timestep();
+                pos_s = getFrenet(pos_x, pos_y, deg2rad(yaw), map_waypoints_x, map_waypoints_y)[0];
             }
 
-            CarState cs_loop = { pos_x, pos_y, v, car_yaw };
+            double dist_inc = SPEED_LIMIT_MS * timestep();
             for (int i = 0; i < 50 - path_size; ++i) {
-                cs_loop = getNextMaxSafeForwardCarStateXY(cs_loop);
-                next_x_vals.push_back(cs_loop.x);
-                next_y_vals.push_back(cs_loop.y);
+                double next_s = pos_s + (i + 1) * dist_inc;
+                vector<double> nextXY = getXY(next_s, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                next_x_vals.push_back(nextXY[0]);
+                next_y_vals.push_back(nextXY[1]);
+                //next_x_vals.push_back(pos_x + (dist_inc * (i + 1)) * cos(deg2rad(car_yaw)));
+                //next_y_vals.push_back(pos_y + (dist_inc * (i + 1)) * sin(deg2rad(car_yaw)));
             }
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
