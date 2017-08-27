@@ -66,3 +66,15 @@ CarState getNextMaxSafeForwardCarState(const CarState &cs) {
 
     return { x2, y2, v2, cs.yaw };
 }
+
+vector<double> getCarXYPointFromGlobalXYPoint(double car_x, double car_y, double yaw, double global_x, double global_y) {
+    const double yaw_r = deg2rad(yaw);
+    // Translate global point by car's position
+    const double xg_trans_c = global_x - car_x;
+    const double yg_trans_c = global_y - car_y;
+    // Perform rotation to finish mapping
+    // from global coords to car coords
+    const double x = +xg_trans_c * cos(yaw_r) + yg_trans_c * sin(yaw_r);
+    const double y = -xg_trans_c * sin(yaw_r) + yg_trans_c * cos(yaw_r);
+    return { x, y };
+}
