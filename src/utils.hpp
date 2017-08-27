@@ -1,5 +1,6 @@
 #include <math.h>
 #include <iostream>
+#include "spline.h"
 
 using namespace std;
 
@@ -111,4 +112,45 @@ int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector
     }
 
     return closestWaypoint;
+}
+
+int getWaypointPrior(int waypoint, int total_waypoints) {
+    return (waypoint - 1) % total_waypoints;
+}
+
+int getWaypointAfter(int waypoint, int total_waypoints) {
+    return (waypoint + 1) % total_waypoints;
+}
+
+tk::spline getSplineFromNearbyWaypoints(
+    double x,
+    double y,
+    double yaw,
+    const vector<double> &maps_x,
+    const vector<double> &maps_y) {
+    int total_waypoints = maps_x.size();
+    int curr_waypoint = NextWaypoint(x, y, yaw, maps_x, maps_y);
+    int prev_waypoint = getWaypointPrior(curr_waypoint, total_waypoints);
+    int next_waypoint = getWaypointAfter(curr_waypoint, total_waypoints);
+
+    int spline_waypoints[] = { prev_waypoint, curr_waypoint, next_waypoint };
+    const int total_spline_points = sizeof(spline_waypoints);
+
+    vector<double> car_waypoints_x;
+    vector<double> car_waypoints_y;
+    for (int i = 0; i < total_spline_points; ++i) {
+        vector<double> car_waypoints_xy = getCarXYPointFromGlobalXYPoint(
+            x,
+            y,
+            yaw,
+            maps_x[i],
+            maps_y[i]);
+        car_waypoints_x.push_back(car_waypoints_xy[0]);
+        car_waypoints_y.push_back(car_waypoints_xy[1]);
+    }
+
+    tk::spline waypoints_spline;
+    waypoints_spline.set_points(car_waypoints_x, car_waypoints_y);
+
+    return waypoints_spline;
 }
