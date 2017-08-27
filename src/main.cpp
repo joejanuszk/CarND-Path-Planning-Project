@@ -212,7 +212,7 @@ int main() {
 
             CarState cs_loop = { pos_x, pos_y, v, car_yaw };
             for (int i = 0; i < 50 - path_size; ++i) {
-                cs_loop = getNextMaxSafeForwardCarState(cs_loop);
+                cs_loop = getNextMaxSafeForwardCarStateXY(cs_loop);
                 next_x_vals.push_back(cs_loop.x);
                 next_y_vals.push_back(cs_loop.y);
             }

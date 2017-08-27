@@ -28,7 +28,7 @@ double mph2ms(double x) { return x / METERS_PER_SEC_IN_MPH; }
 const double SPEED_LIMIT_MPH = 50;
 const double SPEED_LIMIT_MS = mph2ms(SPEED_LIMIT_MPH);
 
-struct CarState {
+struct CarStateXY {
     double x;
     double y;
     double v;
@@ -39,15 +39,15 @@ double getDisplacementInTime(double v, double a, double t) {
     return (v * t) + (a * t * t);
 }
 
-void printCarState(const CarState &cs) {
-    cout << "CarState:\n";
+void printCarState(const CarStateXY &cs) {
+    cout << "CarStateXY:\n";
     cout << "\tx: " << cs.x << "\n";
     cout << "\ty: " << cs.y << "\n";
     cout << "\tv: " << cs.v << "\n";
     cout << "\tyaw: " << cs.yaw << "\n";
 }
 
-CarState getNextMaxSafeForwardCarState(const CarState &cs) {
+CarStateXY getNextMaxSafeForwardCarStateXY(const CarStateXY &cs) {
     double t = timestep();
     double a = max_safe_acceleration();
     double yaw_r = deg2rad(cs.yaw);
