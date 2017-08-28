@@ -107,9 +107,25 @@ vector<double> getCarXYPointFromGlobalXYPoint(double car_x, double car_y, double
     const double yg_trans_c = global_y - car_y;
     // Perform rotation to finish mapping
     // from global coords to car coords
-    const double x = +xg_trans_c * cos(yaw_r) + yg_trans_c * sin(yaw_r);
-    const double y = -xg_trans_c * sin(yaw_r) + yg_trans_c * cos(yaw_r);
+    const double x = xg_trans_c * cos(0 - yaw_r) - yg_trans_c * sin(0 - yaw_r);
+    const double y = xg_trans_c * sin(0 - yaw_r) + yg_trans_c * cos(0 - yaw_r);
     return { x, y };
+}
+
+vector<double> getGlobalXYPointFromCarXYPoint(
+        double car_x,
+        double car_y,
+        double yaw,
+        double x,
+        double y) {
+    const double yaw_r = deg2rad(yaw);
+    // Rotate from car coords into global coords
+    const double xg_trans_c = x * cos(yaw_r - 0) - y * sin(yaw_r - 0);
+    const double yg_trans_c = x * sin(yaw_r - 0) + y * cos(yaw_r - 0);
+
+    const double global_x = xg_trans_c + car_x;
+    const double global_y = yg_trans_c + car_y;
+    return { global_x, global_y };
 }
 
 int getWaypointPrior(int waypoint, int total_waypoints) {

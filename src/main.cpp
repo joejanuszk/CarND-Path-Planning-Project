@@ -115,17 +115,27 @@ int main() {
             double pos_s;
             double yaw;
             double v;
+
             for (int i = 0; i < path_size; ++i) {
                 next_x_vals.push_back(previous_path_x[i]);
                 next_y_vals.push_back(previous_path_y[i]);
             }
 
+            vector<double> spline_pts_x;
+            vector<double> spline_pts_y;
             if (path_size < 2) {
+                double prev_car_x = car_x - cos(deg2rad(car_yaw));
+                double prev_car_y = car_y - sin(deg2rad(car_yaw));
                 pos_x = car_x;
                 pos_y = car_y;
                 pos_s = car_s;
                 yaw = car_yaw;
                 v = car_speed;
+
+                spline_pts_x.push_back(prev_car_x);
+                spline_pts_x.push_back(pos_x);
+                spline_pts_y.push_back(prev_car_y);
+                spline_pts_y.push_back(pos_y);
             }
             else {
                 pos_x = previous_path_x[path_size - 1];
@@ -136,14 +146,66 @@ int main() {
                 yaw = rad2deg(atan2(pos_y - pos_y2, pos_x - pos_x2));
                 v = prev_dist / timestep();
                 pos_s = getFrenet(pos_x, pos_y, deg2rad(yaw), map_waypoints_x, map_waypoints_y)[0];
+
+                spline_pts_x.push_back(pos_x2 - 0.01);
+                spline_pts_x.push_back(pos_x);
+                spline_pts_y.push_back(pos_y2);
+                spline_pts_y.push_back(pos_y);
             }
 
-            double dist_inc = SPEED_LIMIT_MS * timestep();
+            for (int i = 0; i < 3; ++i) {
+                vector<double> next_wp = getXY(
+                        pos_s + (i + 1) * 30,
+                        car_d,
+                        map_waypoints_s,
+                        map_waypoints_x,
+                        map_waypoints_y);
+                spline_pts_x.push_back(next_wp[0]);
+                spline_pts_y.push_back(next_wp[1]);
+            }
+            for (int i = 0; i < spline_pts_x.size(); ++i) {
+                vector<double> car_ref_frame_xy = getCarXYPointFromGlobalXYPoint(
+                        pos_x,
+                        pos_y,
+                        yaw,
+                        spline_pts_x[i],
+                        spline_pts_y[i]);
+                spline_pts_x[i] = car_ref_frame_xy[0];
+                spline_pts_y[i] = car_ref_frame_xy[1];
+            }
+            //for (int i = 0; i < spline_pts_x.size(); ++i) {
+            //    cout << "i: " << i << " x: " << spline_pts_x[i] << " y: " << spline_pts_y[i] << "\n";
+            //}
+            //cout << "path_size: " << path_size << "\n";
+            tk::spline waypoint_spline;
+            waypoint_spline.set_points(spline_pts_x, spline_pts_y);
+
+            double target_v = 20;
+            double target_x = 30;
+            double target_y = waypoint_spline(target_x);
+            double target_dist = sqrt(target_x * target_x + target_y * target_y);
+
+            double x_add_on = 0;
+            double N = target_dist / (timestep() * target_v);
+
+            //double dist_inc = SPEED_LIMIT_MS * timestep();
             for (int i = 0; i < 50 - path_size; ++i) {
-                double next_s = pos_s + (i + 1) * dist_inc;
-                vector<double> nextXY = getXY(next_s, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                next_x_vals.push_back(nextXY[0]);
-                next_y_vals.push_back(nextXY[1]);
+                double x_point = x_add_on + target_x / N;
+                double y_point = waypoint_spline(x_point);
+                x_add_on = x_point;
+
+                vector<double> global_ref_frame_xy = getGlobalXYPointFromCarXYPoint(
+                    pos_x,
+                    pos_y,
+                    yaw,
+                    x_point,
+                    y_point);
+                next_x_vals.push_back(global_ref_frame_xy[0]);
+                next_y_vals.push_back(global_ref_frame_xy[1]);
+                //double next_s = pos_s + (i + 1) * dist_inc;
+                //vector<double> nextXY = getXY(next_s, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                //next_x_vals.push_back(nextXY[0]);
+                //next_y_vals.push_back(nextXY[1]);
                 //next_x_vals.push_back(pos_x + (dist_inc * (i + 1)) * cos(deg2rad(car_yaw)));
                 //next_y_vals.push_back(pos_y + (dist_inc * (i + 1)) * sin(deg2rad(car_yaw)));
             }
