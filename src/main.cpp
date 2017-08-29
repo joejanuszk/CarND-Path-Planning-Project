@@ -112,7 +112,6 @@ int main() {
             double path_size = previous_path_x.size();
             double pos_x;
             double pos_y;
-            double pos_s;
             double yaw;
             double v;
 
@@ -128,7 +127,6 @@ int main() {
                 double prev_car_y = car_y - sin(deg2rad(car_yaw));
                 pos_x = car_x;
                 pos_y = car_y;
-                pos_s = car_s;
                 yaw = car_yaw;
                 v = car_speed;
 
@@ -145,9 +143,8 @@ int main() {
                 double prev_dist = distance(pos_x2, pos_y2, pos_x, pos_y);
                 yaw = rad2deg(atan2(pos_y - pos_y2, pos_x - pos_x2));
                 v = prev_dist / timestep();
-                pos_s = getFrenet(pos_x, pos_y, deg2rad(yaw), map_waypoints_x, map_waypoints_y)[0];
 
-                spline_pts_x.push_back(pos_x2 - 0.01);
+                spline_pts_x.push_back(pos_x2);
                 spline_pts_x.push_back(pos_x);
                 spline_pts_y.push_back(pos_y2);
                 spline_pts_y.push_back(pos_y);
@@ -155,7 +152,7 @@ int main() {
 
             for (int i = 0; i < 3; ++i) {
                 vector<double> next_wp = getXY(
-                        pos_s + (i + 1) * 30,
+                        car_s + (i + 1) * 30,
                         car_d,
                         map_waypoints_s,
                         map_waypoints_x,
