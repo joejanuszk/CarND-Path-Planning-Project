@@ -173,7 +173,7 @@ int main() {
             tk::spline waypoint_spline;
             waypoint_spline.set_points(spline_pts_x, spline_pts_y);
 
-            double target_v = 20;
+            double target_v = getNextAcceleratedSpeed(v);
             double target_x = 30;
             double target_y = waypoint_spline(target_x);
             double target_dist = sqrt(target_x * target_x + target_y * target_y);
@@ -194,6 +194,9 @@ int main() {
                     y_point);
                 next_x_vals.push_back(global_ref_frame_xy[0]);
                 next_y_vals.push_back(global_ref_frame_xy[1]);
+
+                target_v = getNextAcceleratedSpeed(target_v);
+                N = target_dist / (timestep() * target_v);
             }
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds

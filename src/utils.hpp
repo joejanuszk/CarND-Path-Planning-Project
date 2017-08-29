@@ -9,7 +9,7 @@ using namespace std;
 constexpr double timestep() { return 0.02; }
 
 // In meters / second^2
-constexpr double max_safe_acceleration() { return 9.81; }
+constexpr double max_safe_acceleration() { return 9.81 - 2; }
 
 // 1 m/s in mph
 const double METERS_PER_SEC_IN_MPH = 2.23694;
@@ -18,7 +18,7 @@ double ms2mph(double x) { return x * METERS_PER_SEC_IN_MPH; }
 double mph2ms(double x) { return x / METERS_PER_SEC_IN_MPH; }
 
 const double TRACK_LENGTH_M = 6945.554;
-const double SPEED_LIMIT_BUFFER_MPH = 0.5;
+const double SPEED_LIMIT_BUFFER_MPH = 5;
 const double SPEED_LIMIT_MPH = 50 - SPEED_LIMIT_BUFFER_MPH;
 const double SPEED_LIMIT_MS = mph2ms(SPEED_LIMIT_MPH);
 
@@ -98,6 +98,19 @@ CarStateFrenet getNextMaxSafeForwardCarStateFrenet(const CarStateFrenet &cs) {
     double s = getSmallestFrenetS(cs.s + disp);
 
     return { s, cs.d, v2, cs.yaw };
+}
+
+double getNextAcceleratedSpeed(double v1) {
+    double t = timestep();
+    double a = max_safe_acceleration();
+
+    double disp = getDisplacementInTime(v1, a, t);
+    double v2 = disp / t;
+    if (v2 >= SPEED_LIMIT_MS) {
+        v2 = v1;
+    }
+
+    return v2;
 }
 
 vector<double> getCarXYPointFromGlobalXYPoint(double car_x, double car_y, double yaw, double global_x, double global_y) {
