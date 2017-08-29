@@ -170,10 +170,6 @@ int main() {
                 spline_pts_x[i] = car_ref_frame_xy[0];
                 spline_pts_y[i] = car_ref_frame_xy[1];
             }
-            //for (int i = 0; i < spline_pts_x.size(); ++i) {
-            //    cout << "i: " << i << " x: " << spline_pts_x[i] << " y: " << spline_pts_y[i] << "\n";
-            //}
-            //cout << "path_size: " << path_size << "\n";
             tk::spline waypoint_spline;
             waypoint_spline.set_points(spline_pts_x, spline_pts_y);
 
@@ -185,7 +181,6 @@ int main() {
             double x_add_on = 0;
             double N = target_dist / (timestep() * target_v);
 
-            //double dist_inc = SPEED_LIMIT_MS * timestep();
             for (int i = 0; i < 50 - path_size; ++i) {
                 double x_point = x_add_on + target_x / N;
                 double y_point = waypoint_spline(x_point);
@@ -199,12 +194,6 @@ int main() {
                     y_point);
                 next_x_vals.push_back(global_ref_frame_xy[0]);
                 next_y_vals.push_back(global_ref_frame_xy[1]);
-                //double next_s = pos_s + (i + 1) * dist_inc;
-                //vector<double> nextXY = getXY(next_s, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                //next_x_vals.push_back(nextXY[0]);
-                //next_y_vals.push_back(nextXY[1]);
-                //next_x_vals.push_back(pos_x + (dist_inc * (i + 1)) * cos(deg2rad(car_yaw)));
-                //next_y_vals.push_back(pos_y + (dist_inc * (i + 1)) * sin(deg2rad(car_yaw)));
             }
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
