@@ -15,6 +15,29 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
+// lane width in meters
+constexpr double lane_width() { return 4; }
+
+bool isCarInLane(int lane, int d) {
+    double lane_start = lane * lane_width();
+    double lane_end = (lane + 1) * lane_width();
+    return lane_start <= d && d <= lane_end;
+}
+
+class Planner {
+private:
+    int m_curr_lane;
+    int m_goal_lane;
+    int m_closest_car_id;
+
+public:
+    Planner() : m_curr_lane(1), m_goal_lane(1), m_closest_car_id(-1) {}
+
+    int getCurrentLane() { return m_curr_lane; }
+    int getClosestCarID() { return m_closest_car_id; }
+    void setClosestCarID(int id) { m_closest_car_id = id; }
+};
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -67,8 +90,16 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
-                     uWS::OpCode opCode) {
+  Planner planner;
+
+  h.onMessage([
+    &map_waypoints_x,
+    &map_waypoints_y,
+    &map_waypoints_s,
+    &map_waypoints_dx,
+    &map_waypoints_dy,
+    &planner
+  ](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -103,6 +134,23 @@ int main() {
 
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
           	auto sensor_fusion = j[1]["sensor_fusion"];
+
+            int closest_lane_roadmate = -1;
+            double closest_roadmate_s_diff = 100000; // large number
+            for (int i = 0; i < sensor_fusion.size(); ++i) {
+                vector<double> roadmate_data = sensor_fusion[i];
+                double roadmate_id = roadmate_data[0];
+                double roadmate_s = roadmate_data[5];
+                double roadmate_d = roadmate_data[6];
+                double roadmate_s_diff = (roadmate_s + TRACK_LENGTH_M) - car_s;
+                if (isCarInLane(planner.getCurrentLane(), roadmate_d) &&
+                        (roadmate_s + TRACK_LENGTH_M) - (car_s + TRACK_LENGTH_M) > 0 &&
+                        roadmate_s_diff < closest_roadmate_s_diff) {
+                    closest_lane_roadmate = roadmate_id;
+                    closest_roadmate_s_diff= roadmate_s_diff;
+                }
+            }
+            //cout << closest_lane_roadmate << "\t" << (closest_roadmate_s_diff - TRACK_LENGTH_M) << "\n";
 
           	json msgJson;
 
