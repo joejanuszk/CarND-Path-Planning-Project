@@ -137,6 +137,8 @@ int main() {
 
             int closest_lane_roadmate = -1;
             double closest_roadmate_s_diff = 100000; // large number
+            double vx = 9999;
+            double vy = 9999;
             for (int i = 0; i < sensor_fusion.size(); ++i) {
                 vector<double> roadmate_data = sensor_fusion[i];
                 double roadmate_id = roadmate_data[0];
@@ -148,8 +150,12 @@ int main() {
                         roadmate_s_diff < closest_roadmate_s_diff) {
                     closest_lane_roadmate = roadmate_id;
                     closest_roadmate_s_diff= roadmate_s_diff;
+                    vx = roadmate_data[3];
+                    vy = roadmate_data[4];
                 }
             }
+            closest_roadmate_s_diff -= TRACK_LENGTH_M;
+            //cout << vx << "\t" << vy << "\t" << car_yaw << "\n";
             //cout << closest_lane_roadmate << "\t" << (closest_roadmate_s_diff - TRACK_LENGTH_M) << "\n";
 
           	json msgJson;
@@ -221,7 +227,9 @@ int main() {
             tk::spline waypoint_spline;
             waypoint_spline.set_points(spline_pts_x, spline_pts_y);
 
-            double target_v = getNextAcceleratedSpeed(v);
+            bool has_roadmate = closest_lane_roadmate != -1;
+            double roadmate_speed = sqrt(vx * vx + vy * vy);
+            double target_v = getNextAcceleratedSpeed(v, has_roadmate, roadmate_speed, closest_roadmate_s_diff);
             double target_x = 30;
             double target_y = waypoint_spline(target_x);
             double target_dist = sqrt(target_x * target_x + target_y * target_y);
@@ -243,7 +251,7 @@ int main() {
                 next_x_vals.push_back(global_ref_frame_xy[0]);
                 next_y_vals.push_back(global_ref_frame_xy[1]);
 
-                target_v = getNextAcceleratedSpeed(target_v);
+                target_v = getNextAcceleratedSpeed(target_v, has_roadmate, roadmate_speed, closest_roadmate_s_diff);
                 N = target_dist / (timestep() * target_v);
             }
 
