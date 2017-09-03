@@ -26,16 +26,48 @@ bool isCarInLane(int lane, int d) {
 
 class Planner {
 private:
-    int m_curr_lane;
+    int m_car_d;
     int m_goal_lane;
-    int m_closest_car_id;
+    bool m_has_set_d;
+    //bool m_has_hit_goal;
 
 public:
-    Planner() : m_curr_lane(1), m_goal_lane(1), m_closest_car_id(-1) {}
+    //Planner() : m_has_set_d(false), m_has_hit_goal(true) {}
+    Planner() : m_has_set_d(false) {}
 
-    int getCurrentLane() { return m_curr_lane; }
-    int getClosestCarID() { return m_closest_car_id; }
-    void setClosestCarID(int id) { m_closest_car_id = id; }
+    void setCurrentD(double car_d) {
+        m_car_d = car_d;
+        if (!m_has_set_d) {
+            setGoalLane(getCurrentLane());
+            m_has_set_d = true;
+        }
+        //if (isNearGoalLaneD(car_d) {
+        //    m_has_hit_goal = true;
+        //}
+    }
+
+    void setGoalLane(int goal) {
+        m_goal_lane = goal;
+        //if (!m_has_set_d && getCurrentLane() != goal) {
+        //    m_has_hit_goal = false;
+        //}
+    }
+
+    int getGoalLane() {
+        return m_goal_lane;
+    }
+
+    double getGoalLaneD() {
+        return (m_goal_lane + 0.5) * lane_width();
+    }
+
+    int getCurrentLane() {
+        return getLaneForD(m_car_d);
+    }
+
+    static double getLaneForD(double d) {
+        return static_cast<int>(floor(d / lane_width())) % static_cast<int>(lane_width());
+    }
 };
 
 // Checks if the SocketIO event has JSON data.
@@ -135,29 +167,6 @@ int main() {
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
-            int closest_lane_roadmate = -1;
-            double closest_roadmate_s_diff = 100000; // large number
-            double vx = 9999;
-            double vy = 9999;
-            for (int i = 0; i < sensor_fusion.size(); ++i) {
-                vector<double> roadmate_data = sensor_fusion[i];
-                double roadmate_id = roadmate_data[0];
-                double roadmate_s = roadmate_data[5];
-                double roadmate_d = roadmate_data[6];
-                double roadmate_s_diff = (roadmate_s + TRACK_LENGTH_M) - car_s;
-                if (isCarInLane(planner.getCurrentLane(), roadmate_d) &&
-                        (roadmate_s + TRACK_LENGTH_M) - (car_s + TRACK_LENGTH_M) > 0 &&
-                        roadmate_s_diff < closest_roadmate_s_diff) {
-                    closest_lane_roadmate = roadmate_id;
-                    closest_roadmate_s_diff= roadmate_s_diff;
-                    vx = roadmate_data[3];
-                    vy = roadmate_data[4];
-                }
-            }
-            closest_roadmate_s_diff -= TRACK_LENGTH_M;
-            //cout << vx << "\t" << vy << "\t" << car_yaw << "\n";
-            //cout << closest_lane_roadmate << "\t" << (closest_roadmate_s_diff - TRACK_LENGTH_M) << "\n";
-
           	json msgJson;
 
           	vector<double> next_x_vals;
@@ -202,12 +211,54 @@ int main() {
                 spline_pts_x.push_back(pos_x);
                 spline_pts_y.push_back(pos_y2);
                 spline_pts_y.push_back(pos_y);
+
+                car_s = end_path_s;
+                car_d = end_path_d;
+            }
+            planner.setCurrentD(car_d);
+
+            /*
+            double goal_car_d = planner.getGoalLane();
+            if (wants to change lange) {
+                goal_car_d = target_d of 
+            }
+            */
+
+            int closest_lane_roadmate = -1;
+            double closest_roadmate_s_diff = 100000; // large number
+            double vx = 9999;
+            double vy = 9999;
+            for (int i = 0; i < sensor_fusion.size(); ++i) {
+                vector<double> roadmate_data = sensor_fusion[i];
+                double roadmate_id = roadmate_data[0];
+                double roadmate_s = roadmate_data[5];
+                double roadmate_d = roadmate_data[6];
+                double roadmate_s_diff = (roadmate_s + TRACK_LENGTH_M) - car_s;
+                if (isCarInLane(planner.getCurrentLane(), roadmate_d) &&
+                        (roadmate_s + TRACK_LENGTH_M) - (car_s + TRACK_LENGTH_M) > 0 &&
+                        roadmate_s_diff < closest_roadmate_s_diff) {
+                    closest_lane_roadmate = roadmate_id;
+                    closest_roadmate_s_diff = roadmate_s_diff;
+                    vx = roadmate_data[3];
+                    vy = roadmate_data[4];
+                }
+            }
+            closest_roadmate_s_diff -= TRACK_LENGTH_M;
+            bool has_roadmate = closest_lane_roadmate != -1;
+            double roadmate_speed = sqrt(vx * vx + vy * vy);
+
+            // TODO refactor - this logic is used here
+            // and in getNextAcceleratedSpeed
+            if (has_roadmate && closest_roadmate_s_diff < 20) {
+                int goal_lane = 0;
+                planner.setGoalLane(goal_lane);
             }
 
             for (int i = 0; i < 3; ++i) {
                 vector<double> next_wp = getXY(
                         car_s + (i + 1) * 30,
-                        car_d,
+                        //car_d,
+                        planner.getGoalLaneD(),
                         map_waypoints_s,
                         map_waypoints_x,
                         map_waypoints_y);
@@ -226,9 +277,6 @@ int main() {
             }
             tk::spline waypoint_spline;
             waypoint_spline.set_points(spline_pts_x, spline_pts_y);
-
-            bool has_roadmate = closest_lane_roadmate != -1;
-            double roadmate_speed = sqrt(vx * vx + vy * vy);
             double target_v = getNextAcceleratedSpeed(v, has_roadmate, roadmate_speed, closest_roadmate_s_diff);
             double target_x = 30;
             double target_y = waypoint_spline(target_x);
