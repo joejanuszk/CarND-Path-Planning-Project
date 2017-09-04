@@ -100,10 +100,10 @@ CarStateFrenet getNextMaxSafeForwardCarStateFrenet(const CarStateFrenet &cs) {
     return { s, cs.d, v2, cs.yaw };
 }
 
-double getNextAcceleratedSpeed(double v1, bool has_roadmate, double roadmate_speed, double s_diff) {
+double getNextAcceleratedSpeed(double v1, double roadmate_speed, bool isLaneRoadmateTooClose) {
     double t = timestep();
     double a = max_safe_acceleration();
-    double speed_limit = (has_roadmate && s_diff < 30)?
+    double speed_limit = isLaneRoadmateTooClose?
             min(roadmate_speed, SPEED_LIMIT_MS):
             SPEED_LIMIT_MS;
     double dir = speed_limit > v1 ? 1 : -1;

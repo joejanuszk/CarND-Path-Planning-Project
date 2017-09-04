@@ -112,8 +112,9 @@ public:
 
     bool hasLaneRoadmate() { return m_lane_roadmate_id != -1; }
     double getLaneRoadmateSpeed() { return m_lane_speed; }
-    // TODO: remove method; external code shouldn't need this
-    double getLaneRoadmateSDiff() { return m_lane_s_diff; }
+    bool isLaneRoadmateTooClose() {
+        return hasLaneRoadmate() && m_lane_s_diff < 30;
+    }
 };
 
 // Checks if the SocketIO event has JSON data.
@@ -263,14 +264,10 @@ int main() {
             }
             planner.setCurrentD(car_d);
 
-            RoadmateAnalyzer roadmate_analyzer(sensor_fusion, planner.getCurrentLane(), car_s, path_size);
-            double closest_roadmate_s_diff = roadmate_analyzer.getLaneRoadmateSDiff();
-            bool has_roadmate = roadmate_analyzer.hasLaneRoadmate();
-            double roadmate_speed = roadmate_analyzer.getLaneRoadmateSpeed();
+            RoadmateAnalyzer ra(sensor_fusion, planner.getCurrentLane(), car_s, path_size);
+            double roadmate_speed = ra.getLaneRoadmateSpeed();
 
-            // TODO refactor - this logic is used here
-            // and in getNextAcceleratedSpeed
-            if (has_roadmate && closest_roadmate_s_diff < 30) {
+            if (ra.isLaneRoadmateTooClose()) {
                 int goal_lane = 0;
                 planner.setGoalLane(goal_lane);
             }
@@ -298,7 +295,7 @@ int main() {
             }
             tk::spline waypoint_spline;
             waypoint_spline.set_points(spline_pts_x, spline_pts_y);
-            double target_v = getNextAcceleratedSpeed(v, has_roadmate, roadmate_speed, closest_roadmate_s_diff);
+            double target_v = getNextAcceleratedSpeed(v, roadmate_speed, ra.isLaneRoadmateTooClose());
             double target_x = 30;
             double target_y = waypoint_spline(target_x);
             double target_dist = sqrt(target_x * target_x + target_y * target_y);
@@ -320,7 +317,7 @@ int main() {
                 next_x_vals.push_back(global_ref_frame_xy[0]);
                 next_y_vals.push_back(global_ref_frame_xy[1]);
 
-                target_v = getNextAcceleratedSpeed(target_v, has_roadmate, roadmate_speed, closest_roadmate_s_diff);
+                target_v = getNextAcceleratedSpeed(target_v, roadmate_speed, ra.isLaneRoadmateTooClose());
                 N = target_dist / (timestep() * target_v);
             }
 
