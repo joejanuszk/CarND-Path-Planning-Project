@@ -80,11 +80,23 @@ public:
     }
 };
 
+class Roadmate {
+private:
+    int m_id;
+    double m_s_diff;
+    double m_speed;
+
+public:
+    Roadmate(int id, double s_diff, double speed) : m_id(id), m_s_diff(s_diff), m_speed(speed) {}
+
+    int getID() { return m_id; }
+    double getSDiff() { return m_s_diff; }
+    double getSpeed() { return m_speed; }
+};
+
 class RoadmateAnalyzer {
 private:
-    int m_lane_roadmate_id = -1;
-    double m_lane_s_diff = 100000; // large number
-    double m_lane_speed = 9999;
+    Roadmate *lane_roadmate = nullptr;
 
 public:
     RoadmateAnalyzer(
@@ -92,28 +104,38 @@ public:
             int curr_lane,
             double car_s,
             int path_size) {
+        double lane_s_diff = 100000; // large number
         for (int i = 0; i < sensor_fusion.size(); ++i) {
             vector<double> roadmate_data = sensor_fusion[i];
-            int roadmate_id = static_cast<int>(roadmate_data[0]);
+            int id = static_cast<int>(roadmate_data[0]);
             double vx = roadmate_data[3];
             double vy = roadmate_data[4];
             double s = roadmate_data[5];
             double d = roadmate_data[6];
-            double v = sqrt(vx * vx + vy * vy);
-            double s_diff = (s + path_size * timestep() * v + TRACK_LENGTH_M) - car_s;
-            if (isCarInLane(curr_lane, d) && s - car_s > 0 && s_diff < m_lane_s_diff) {
-                m_lane_roadmate_id = roadmate_id;
-                m_lane_s_diff = s_diff;
-                m_lane_speed = v;
+            double speed = sqrt(vx * vx + vy * vy);
+            double s_diff = (s + path_size * timestep() * speed + TRACK_LENGTH_M) - car_s;
+            if (isCarInLane(curr_lane, d) && s - car_s > 0 && s_diff < lane_s_diff) {
+                delete lane_roadmate;
+                lane_roadmate = new Roadmate(id, s_diff - TRACK_LENGTH_M, speed);
+                lane_s_diff = s_diff;
             }
         }
-        m_lane_s_diff -= TRACK_LENGTH_M;
     }
 
-    bool hasLaneRoadmate() { return m_lane_roadmate_id != -1; }
-    double getLaneRoadmateSpeed() { return m_lane_speed; }
+    ~RoadmateAnalyzer() {
+        delete lane_roadmate;
+    }
+
+    bool hasLaneRoadmate() {
+        return lane_roadmate != nullptr;
+    }
+
+    double getLaneRoadmateSpeed() {
+        return hasLaneRoadmate() ? lane_roadmate->getSpeed() : 0;
+    }
+
     bool isLaneRoadmateTooClose() {
-        return hasLaneRoadmate() && m_lane_s_diff < 30;
+        return hasLaneRoadmate() && lane_roadmate->getSDiff() < 30;
     }
 };
 
@@ -275,7 +297,6 @@ int main() {
             for (int i = 0; i < 3; ++i) {
                 vector<double> next_wp = getXY(
                         car_s + (i + 1) * 30,
-                        //car_d,
                         planner.getGoalLaneCenterD(),
                         map_waypoints_s,
                         map_waypoints_x,
