@@ -233,7 +233,10 @@ int main() {
                 double roadmate_id = roadmate_data[0];
                 double roadmate_s = roadmate_data[5];
                 double roadmate_d = roadmate_data[6];
-                double roadmate_s_diff = (roadmate_s + TRACK_LENGTH_M) - car_s;
+                double rvx = roadmate_data[3];
+                double rvy = roadmate_data[4];
+                double this_roadmate_speed = sqrt(rvx * rvx + rvy * rvy);
+                double roadmate_s_diff = (roadmate_s + path_size * timestep() * this_roadmate_speed + TRACK_LENGTH_M) - car_s;
                 if (isCarInLane(planner.getCurrentLane(), roadmate_d) &&
                         (roadmate_s + TRACK_LENGTH_M) - (car_s + TRACK_LENGTH_M) > 0 &&
                         roadmate_s_diff < closest_roadmate_s_diff) {
@@ -249,7 +252,7 @@ int main() {
 
             // TODO refactor - this logic is used here
             // and in getNextAcceleratedSpeed
-            if (has_roadmate && closest_roadmate_s_diff < 20) {
+            if (has_roadmate && closest_roadmate_s_diff < 30) {
                 int goal_lane = 0;
                 planner.setGoalLane(goal_lane);
             }
