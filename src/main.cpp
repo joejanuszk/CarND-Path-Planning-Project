@@ -80,6 +80,42 @@ public:
     }
 };
 
+class RoadmateAnalyzer {
+private:
+    int m_lane_roadmate_id = -1;
+    double m_lane_s_diff = 100000; // large number
+    double m_lane_speed = 9999;
+
+public:
+    RoadmateAnalyzer(
+            const vector<vector<double>>& sensor_fusion,
+            int curr_lane,
+            double car_s,
+            int path_size) {
+        for (int i = 0; i < sensor_fusion.size(); ++i) {
+            vector<double> roadmate_data = sensor_fusion[i];
+            int roadmate_id = static_cast<int>(roadmate_data[0]);
+            double vx = roadmate_data[3];
+            double vy = roadmate_data[4];
+            double s = roadmate_data[5];
+            double d = roadmate_data[6];
+            double v = sqrt(vx * vx + vy * vy);
+            double s_diff = (s + path_size * timestep() * v + TRACK_LENGTH_M) - car_s;
+            if (isCarInLane(curr_lane, d) && s - car_s > 0 && s_diff < m_lane_s_diff) {
+                m_lane_roadmate_id = roadmate_id;
+                m_lane_s_diff = s_diff;
+                m_lane_speed = v;
+            }
+        }
+        m_lane_s_diff -= TRACK_LENGTH_M;
+    }
+
+    bool hasLaneRoadmate() { return m_lane_roadmate_id != -1; }
+    double getLaneRoadmateSpeed() { return m_lane_speed; }
+    // TODO: remove method; external code shouldn't need this
+    double getLaneRoadmateSDiff() { return m_lane_s_diff; }
+};
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -227,38 +263,10 @@ int main() {
             }
             planner.setCurrentD(car_d);
 
-            /*
-            double goal_car_d = planner.getGoalLane();
-            if (wants to change lange) {
-                goal_car_d = target_d of 
-            }
-            */
-
-            int closest_lane_roadmate = -1;
-            double closest_roadmate_s_diff = 100000; // large number
-            double vx = 9999;
-            double vy = 9999;
-            for (int i = 0; i < sensor_fusion.size(); ++i) {
-                vector<double> roadmate_data = sensor_fusion[i];
-                double roadmate_id = roadmate_data[0];
-                double roadmate_s = roadmate_data[5];
-                double roadmate_d = roadmate_data[6];
-                double rvx = roadmate_data[3];
-                double rvy = roadmate_data[4];
-                double this_roadmate_speed = sqrt(rvx * rvx + rvy * rvy);
-                double roadmate_s_diff = (roadmate_s + path_size * timestep() * this_roadmate_speed + TRACK_LENGTH_M) - car_s;
-                if (isCarInLane(planner.getCurrentLane(), roadmate_d) &&
-                        (roadmate_s + TRACK_LENGTH_M) - (car_s + TRACK_LENGTH_M) > 0 &&
-                        roadmate_s_diff < closest_roadmate_s_diff) {
-                    closest_lane_roadmate = roadmate_id;
-                    closest_roadmate_s_diff = roadmate_s_diff;
-                    vx = roadmate_data[3];
-                    vy = roadmate_data[4];
-                }
-            }
-            closest_roadmate_s_diff -= TRACK_LENGTH_M;
-            bool has_roadmate = closest_lane_roadmate != -1;
-            double roadmate_speed = sqrt(vx * vx + vy * vy);
+            RoadmateAnalyzer roadmate_analyzer(sensor_fusion, planner.getCurrentLane(), car_s, path_size);
+            double closest_roadmate_s_diff = roadmate_analyzer.getLaneRoadmateSDiff();
+            bool has_roadmate = roadmate_analyzer.hasLaneRoadmate();
+            double roadmate_speed = roadmate_analyzer.getLaneRoadmateSpeed();
 
             // TODO refactor - this logic is used here
             // and in getNextAcceleratedSpeed
