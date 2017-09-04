@@ -57,12 +57,22 @@ public:
         return m_goal_lane;
     }
 
-    double getGoalLaneD() {
-        return (m_goal_lane + 0.5) * lane_width();
+    double getGoalLaneCenterD() {
+        return getLaneCenterD(m_goal_lane);
     }
 
     int getCurrentLane() {
         return getLaneForD(m_car_d);
+    }
+
+    // define "centered" as no more than 0.5m offset from center
+    bool isCenteredInLane() {
+        int lane_center_d = getLaneCenterD(getCurrentLane());
+        return abs(lane_center_d - m_car_d) < 0.5;
+    }
+
+    static double getLaneCenterD(int lane) {
+        return (lane + 0.5) * lane_width();
     }
 
     static double getLaneForD(double d) {
@@ -261,7 +271,7 @@ int main() {
                 vector<double> next_wp = getXY(
                         car_s + (i + 1) * 30,
                         //car_d,
-                        planner.getGoalLaneD(),
+                        planner.getGoalLaneCenterD(),
                         map_waypoints_s,
                         map_waypoints_x,
                         map_waypoints_y);
