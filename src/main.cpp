@@ -15,21 +15,6 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
-// lane width in meters
-constexpr double lane_width() { return 4; }
-
-// meters
-constexpr double too_close_distance() { return 20; }
-
-// meters
-constexpr double large_s_value() { return 100000; }
-
-bool isCarInLane(int lane, int d) {
-    double lane_start = lane * lane_width();
-    double lane_end = (lane + 1) * lane_width();
-    return lane_start <= d && d <= lane_end;
-}
-
 class Planner {
 private:
     double m_car_d;
