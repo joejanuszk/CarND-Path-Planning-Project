@@ -18,7 +18,7 @@ const double METERS_PER_SEC_IN_MPH = 2.23694;
 constexpr double lane_width() { return 4; }
 
 // meters
-constexpr double too_close_distance() { return 20; }
+constexpr double too_close_distance() { return 15; }
 
 // meters
 constexpr double large_s_value() { return 100000; }
