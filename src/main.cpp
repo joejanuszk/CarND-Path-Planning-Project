@@ -69,6 +69,10 @@ public:
         return abs(lane_center_d - m_car_d) < 0.7;
     }
 
+    bool isChangingLanes() {
+        return getGoalLane() != getCurrentLane() && !isCenteredInLane();
+    }
+
     static double getLaneCenterD(int lane) {
         return (lane + 0.5) * lane_width();
     }
@@ -437,7 +441,7 @@ int main() {
             }
             tk::spline waypoint_spline;
             waypoint_spline.set_points(spline_pts_x, spline_pts_y);
-            double target_v = getNextAcceleratedSpeed(v, roadmate_speed, ra.isLaneRoadmateTooClose());
+            double target_v = getNextAcceleratedSpeed(v, roadmate_speed, ra.isLaneRoadmateTooClose(), planner.isChangingLanes());
             double target_x = 30;
             double target_y = waypoint_spline(target_x);
             double target_dist = sqrt(target_x * target_x + target_y * target_y);
@@ -459,7 +463,7 @@ int main() {
                 next_x_vals.push_back(global_ref_frame_xy[0]);
                 next_y_vals.push_back(global_ref_frame_xy[1]);
 
-                target_v = getNextAcceleratedSpeed(target_v, roadmate_speed, ra.isLaneRoadmateTooClose());
+                target_v = getNextAcceleratedSpeed(target_v, roadmate_speed, ra.isLaneRoadmateTooClose(), planner.isChangingLanes());
                 N = target_dist / (timestep() * target_v);
             }
 

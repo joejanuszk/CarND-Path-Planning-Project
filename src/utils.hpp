@@ -100,10 +100,13 @@ CarStateFrenet getNextMaxSafeForwardCarStateFrenet(const CarStateFrenet &cs) {
     return { s, cs.d, v2, cs.yaw };
 }
 
-double getNextAcceleratedSpeed(double v1, double roadmate_speed, bool isLaneRoadmateTooClose) {
+double getNextAcceleratedSpeed(double v1, double roadmate_speed, bool is_lane_roadmate_too_close, bool is_changing_lanes) {
     double t = timestep();
-    double a = max_safe_acceleration();
-    double speed_limit = isLaneRoadmateTooClose?
+    // limit forward acceleration while changing lanes
+    // to reduce risk of exceeding max allowed value
+    double safe_acceleration_coefficient = is_changing_lanes ? 0.3 : 0.8;
+    double a = safe_acceleration_coefficient * max_safe_acceleration();
+    double speed_limit = is_lane_roadmate_too_close?
             min(roadmate_speed, SPEED_LIMIT_MS):
             SPEED_LIMIT_MS;
     double dir = speed_limit > v1 ? 1 : -1;
