@@ -18,6 +18,9 @@ using json = nlohmann::json;
 // lane width in meters
 constexpr double lane_width() { return 4; }
 
+// meters
+constexpr double too_close_distance() { return 20; }
+
 bool isCarInLane(int lane, int d) {
     double lane_start = lane * lane_width();
     double lane_end = (lane + 1) * lane_width();
@@ -26,13 +29,11 @@ bool isCarInLane(int lane, int d) {
 
 class Planner {
 private:
-    int m_car_d;
+    double m_car_d;
     int m_goal_lane;
     bool m_has_set_d;
-    //bool m_has_hit_goal;
 
 public:
-    //Planner() : m_has_set_d(false), m_has_hit_goal(true) {}
     Planner() : m_has_set_d(false) {}
 
     void setCurrentD(double car_d) {
@@ -41,16 +42,10 @@ public:
             setGoalLane(getCurrentLane());
             m_has_set_d = true;
         }
-        //if (isNearGoalLaneD(car_d) {
-        //    m_has_hit_goal = true;
-        //}
     }
 
     void setGoalLane(int goal) {
         m_goal_lane = goal;
-        //if (!m_has_set_d && getCurrentLane() != goal) {
-        //    m_has_hit_goal = false;
-        //}
     }
 
     int getGoalLane() {
@@ -65,10 +60,10 @@ public:
         return getLaneForD(m_car_d);
     }
 
-    // define "centered" as no more than 0.5m offset from center
+    // define "centered" as no more than some well-chosen offset from center
     bool isCenteredInLane() {
-        int lane_center_d = getLaneCenterD(getCurrentLane());
-        return abs(lane_center_d - m_car_d) < 0.5;
+        double lane_center_d = getLaneCenterD(getCurrentLane());
+        return abs(lane_center_d - m_car_d) < 0.7;
     }
 
     static double getLaneCenterD(int lane) {
@@ -96,15 +91,23 @@ public:
 
 class RoadmateAnalyzer {
 private:
-    Roadmate *lane_roadmate = nullptr;
+    Roadmate *lane_roadmate;
+    Roadmate *left_roadmate;
+    Roadmate *right_roadmate;
 
 public:
     RoadmateAnalyzer(
             const vector<vector<double>>& sensor_fusion,
             int curr_lane,
             double car_s,
-            int path_size) {
+            int path_size) :
+            lane_roadmate(nullptr),
+            left_roadmate(nullptr),
+            right_roadmate(nullptr) {
         double lane_s_diff = 100000; // large number
+        double left_s_diff = 100000;
+        double right_s_diff = 100000;
+
         for (int i = 0; i < sensor_fusion.size(); ++i) {
             vector<double> roadmate_data = sensor_fusion[i];
             int id = static_cast<int>(roadmate_data[0]);
@@ -113,17 +116,33 @@ public:
             double s = roadmate_data[5];
             double d = roadmate_data[6];
             double speed = sqrt(vx * vx + vy * vy);
-            double s_diff = (s + path_size * timestep() * speed + TRACK_LENGTH_M) - car_s;
-            if (isCarInLane(curr_lane, d) && s - car_s > 0 && s_diff < lane_s_diff) {
+            double s_diff = s + path_size * timestep() * speed - car_s;
+            bool isAhead = s_diff > 0;
+
+            if (isCarInLane(curr_lane, d) && isAhead && s_diff < lane_s_diff) {
                 delete lane_roadmate;
-                lane_roadmate = new Roadmate(id, s_diff - TRACK_LENGTH_M, speed);
+                lane_roadmate = new Roadmate(id, s_diff, speed);
                 lane_s_diff = s_diff;
+            }
+
+            if (isCarInLane(curr_lane - 1, d) && isAhead && s_diff < left_s_diff) {
+                delete left_roadmate;
+                left_roadmate = new Roadmate(id, s_diff, speed);
+                left_s_diff = s_diff;
+            }
+
+            if (isCarInLane(curr_lane + 1, d) && isAhead && s_diff < right_s_diff) {
+                delete right_roadmate;
+                right_roadmate = new Roadmate(id, s_diff, speed);
+                right_s_diff = s_diff;
             }
         }
     }
 
     ~RoadmateAnalyzer() {
         delete lane_roadmate;
+        delete left_roadmate;
+        delete right_roadmate;
     }
 
     bool hasLaneRoadmate() {
@@ -135,7 +154,45 @@ public:
     }
 
     bool isLaneRoadmateTooClose() {
-        return hasLaneRoadmate() && lane_roadmate->getSDiff() < 30;
+        return hasLaneRoadmate() && lane_roadmate->getSDiff() < too_close_distance();
+    }
+
+    bool hasLeftRoadmate() {
+        return left_roadmate != nullptr;
+    }
+
+    double getLeftRoadmateSpeed() {
+        return hasLeftRoadmate() ? left_roadmate->getSpeed() : 0;
+    }
+
+    bool isLeftRoadmateTooClose() {
+        return hasLeftRoadmate() && left_roadmate->getSDiff() < too_close_distance();
+    }
+
+    bool isLeftRoadmateReasonablyFarAhead() {
+        if (hasLeftRoadmate()) {
+            return left_roadmate->getSDiff() > 2 * too_close_distance();
+        }
+        return true;
+    }
+
+    bool hasRightRoadmate() {
+        return right_roadmate != nullptr;
+    }
+
+    double getRightRoadmateSpeed() {
+        return hasRightRoadmate() ? right_roadmate->getSpeed() : 0;
+    }
+
+    bool isRightRoadmateTooClose() {
+        return hasRightRoadmate() && right_roadmate->getSDiff() < too_close_distance();
+    }
+
+    bool isRightRoadmateReasonablyFarAhead() {
+        if (hasRightRoadmate()) {
+            return right_roadmate->getSDiff() > 2 * too_close_distance();
+        }
+        return true;
     }
 };
 
@@ -289,9 +346,37 @@ int main() {
             RoadmateAnalyzer ra(sensor_fusion, planner.getCurrentLane(), car_s, path_size);
             double roadmate_speed = ra.getLaneRoadmateSpeed();
 
-            if (ra.isLaneRoadmateTooClose()) {
-                int goal_lane = 0;
-                planner.setGoalLane(goal_lane);
+            if (ra.isLaneRoadmateTooClose() && planner.isCenteredInLane()) {
+                int curr_lane = planner.getCurrentLane();
+                if (curr_lane == 1) {
+                    double lane_rm_speed = ra.getLaneRoadmateSpeed();
+                    double left_rm_speed = ra.getLeftRoadmateSpeed();
+                    double right_rm_speed = ra.getRightRoadmateSpeed();
+                    if ((left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) ||
+                            ra.isLeftRoadmateReasonablyFarAhead()) {
+                        planner.setGoalLane(0);
+                    }
+                    else if ((right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) ||
+                            ra.isRightRoadmateReasonablyFarAhead()) {
+                        planner.setGoalLane(2);
+                    }
+                }
+                if (curr_lane == 0) {
+                    double lane_rm_speed = ra.getLaneRoadmateSpeed();
+                    double right_rm_speed = ra.getRightRoadmateSpeed();
+                    if ((right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) ||
+                            ra.isRightRoadmateReasonablyFarAhead()) {
+                        planner.setGoalLane(1);
+                    }
+                }
+                if (curr_lane == 2) {
+                    double lane_rm_speed = ra.getLaneRoadmateSpeed();
+                    double left_rm_speed = ra.getLeftRoadmateSpeed();
+                    if ((left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) ||
+                            ra.isLeftRoadmateReasonablyFarAhead()) {
+                        planner.setGoalLane(1);
+                    }
+                }
             }
 
             for (int i = 0; i < 3; ++i) {
