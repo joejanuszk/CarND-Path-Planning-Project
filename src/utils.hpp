@@ -3,6 +3,9 @@
 #include "coord_utils.hpp"
 #include "spline.h"
 
+#ifndef CARND_PATH_PLANNING_UTILS
+#define CARND_PATH_PLANNING_UTILS
+
 using namespace std;
 
 // In seconds
@@ -88,3 +91,5 @@ bool isCarInLane(int lane, int d) {
     double lane_end = (lane + 1) * lane_width();
     return lane_start <= d && d <= lane_end;
 }
+
+#endif

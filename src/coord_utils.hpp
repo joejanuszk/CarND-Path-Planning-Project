@@ -1,6 +1,9 @@
 #include <math.h>
 #include <vector>
 
+#ifndef CARND_PATH_PLANNING_COORD_UTILS
+#define CARND_PATH_PLANNING_COORD_UTILS
+
 using namespace std;
 
 // For converting back and forth between radians and degrees.
@@ -113,3 +116,5 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 
     return { x, y };
 }
+
+#endif

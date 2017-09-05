@@ -3,6 +3,8 @@
 #ifndef CARND_PATH_PLANNING_PLANNER
 #define CARND_PATH_PLANNING_PLANNER
 
+using namespace std;
+
 class Planner {
 private:
     double m_car_d;
