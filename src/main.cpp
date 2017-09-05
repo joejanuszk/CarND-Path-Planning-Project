@@ -21,6 +21,9 @@ constexpr double lane_width() { return 4; }
 // meters
 constexpr double too_close_distance() { return 20; }
 
+// meters
+constexpr double large_s_value() { return 100000; }
+
 bool isCarInLane(int lane, int d) {
     double lane_start = lane * lane_width();
     double lane_end = (lane + 1) * lane_width();
@@ -94,6 +97,8 @@ private:
     Roadmate *lane_roadmate;
     Roadmate *left_roadmate;
     Roadmate *right_roadmate;
+    bool is_left_change_safe;
+    bool is_right_change_safe;
 
 public:
     RoadmateAnalyzer(
@@ -101,12 +106,14 @@ public:
             int curr_lane,
             double car_s,
             int path_size) :
+            is_left_change_safe(true),
+            is_right_change_safe(true),
             lane_roadmate(nullptr),
             left_roadmate(nullptr),
             right_roadmate(nullptr) {
-        double lane_s_diff = 100000; // large number
-        double left_s_diff = 100000;
-        double right_s_diff = 100000;
+        double lane_s_diff = large_s_value();
+        double left_s_diff = large_s_value();
+        double right_s_diff = large_s_value();
 
         for (int i = 0; i < sensor_fusion.size(); ++i) {
             vector<double> roadmate_data = sensor_fusion[i];
@@ -117,24 +124,37 @@ public:
             double d = roadmate_data[6];
             double speed = sqrt(vx * vx + vy * vy);
             double s_diff = s + path_size * timestep() * speed - car_s;
-            bool isAhead = s_diff > 0;
+            bool is_ahead = s_diff > 0;
 
-            if (isCarInLane(curr_lane, d) && isAhead && s_diff < lane_s_diff) {
+            bool is_rm_in_curr_lane = isCarInLane(curr_lane, d);
+            if (is_rm_in_curr_lane && is_ahead && s_diff < lane_s_diff) {
                 delete lane_roadmate;
                 lane_roadmate = new Roadmate(id, s_diff, speed);
                 lane_s_diff = s_diff;
             }
 
-            if (isCarInLane(curr_lane - 1, d) && isAhead && s_diff < left_s_diff) {
+            bool is_rm_in_left_lane = isCarInLane(curr_lane - 1, d);
+            if (is_rm_in_left_lane && is_ahead && s_diff < left_s_diff) {
                 delete left_roadmate;
                 left_roadmate = new Roadmate(id, s_diff, speed);
                 left_s_diff = s_diff;
             }
+            if (is_rm_in_left_lane && !is_ahead) {
+                if (abs(s_diff) - too_close_distance() < 0) {
+                    is_left_change_safe = false;
+                }
+            }
 
-            if (isCarInLane(curr_lane + 1, d) && isAhead && s_diff < right_s_diff) {
+            bool is_rm_in_right_lane = isCarInLane(curr_lane + 1, d);
+            if (is_rm_in_right_lane && is_ahead && s_diff < right_s_diff) {
                 delete right_roadmate;
                 right_roadmate = new Roadmate(id, s_diff, speed);
                 right_s_diff = s_diff;
+            }
+            if (is_rm_in_right_lane && !is_ahead) {
+                if (abs(s_diff) - too_close_distance() < 0) {
+                    is_right_change_safe = false;
+                }
             }
         }
     }
@@ -193,6 +213,14 @@ public:
             return right_roadmate->getSDiff() > 2 * too_close_distance();
         }
         return true;
+    }
+
+    bool isSafeToChangeLeft() {
+        return is_left_change_safe;
+    }
+
+    bool isSafeToChangeRight() {
+        return is_right_change_safe;
     }
 };
 
@@ -352,28 +380,28 @@ int main() {
                     double lane_rm_speed = ra.getLaneRoadmateSpeed();
                     double left_rm_speed = ra.getLeftRoadmateSpeed();
                     double right_rm_speed = ra.getRightRoadmateSpeed();
-                    if ((left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) ||
-                            ra.isLeftRoadmateReasonablyFarAhead()) {
+                    bool isWorthChangingLeft = (left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) || ra.isLeftRoadmateReasonablyFarAhead();
+                    bool isWorthChangingRight = (right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) || ra.isRightRoadmateReasonablyFarAhead();
+                    if (isWorthChangingLeft && ra.isSafeToChangeLeft()) {
                         planner.setGoalLane(0);
                     }
-                    else if ((right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) ||
-                            ra.isRightRoadmateReasonablyFarAhead()) {
+                    else if (isWorthChangingRight && ra.isSafeToChangeRight()) {
                         planner.setGoalLane(2);
                     }
                 }
                 if (curr_lane == 0) {
                     double lane_rm_speed = ra.getLaneRoadmateSpeed();
                     double right_rm_speed = ra.getRightRoadmateSpeed();
-                    if ((right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) ||
-                            ra.isRightRoadmateReasonablyFarAhead()) {
+                    bool isWorthChangingRight = (right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) || ra.isRightRoadmateReasonablyFarAhead();
+                    if (isWorthChangingRight && ra.isSafeToChangeRight()) {
                         planner.setGoalLane(1);
                     }
                 }
                 if (curr_lane == 2) {
                     double lane_rm_speed = ra.getLaneRoadmateSpeed();
                     double left_rm_speed = ra.getLeftRoadmateSpeed();
-                    if ((left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) ||
-                            ra.isLeftRoadmateReasonablyFarAhead()) {
+                    bool isWorthChangingLeft = (left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) || ra.isLeftRoadmateReasonablyFarAhead();
+                    if (isWorthChangingLeft && ra.isSafeToChangeLeft()) {
                         planner.setGoalLane(1);
                     }
                 }
