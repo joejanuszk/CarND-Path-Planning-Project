@@ -120,10 +120,18 @@ public:
             int id = static_cast<int>(roadmate_data[0]);
             double vx = roadmate_data[3];
             double vy = roadmate_data[4];
-            double s = roadmate_data[5];
-            double d = roadmate_data[6];
             double speed = sqrt(vx * vx + vy * vy);
-            double s_diff = s + path_size * timestep() * speed - car_s;
+            double s = roadmate_data[5] + path_size * timestep() * speed;
+            double d = roadmate_data[6];
+            double s_diff = s - car_s;
+            // handle track wraparound while allowing a safe amount of
+            // negative value; i.e. do not treat as "pure" modular math
+            if (s_diff < -0.5 * TRACK_LENGTH_M) {
+                s_diff += TRACK_LENGTH_M;
+            }
+            if (s_diff > 0.5 * TRACK_LENGTH_M) {
+                s_diff -= TRACK_LENGTH_M;
+            }
             bool is_ahead = s_diff > 0;
 
             bool is_rm_in_curr_lane = isCarInLane(curr_lane, d);
