@@ -197,6 +197,13 @@ public:
         return hasLeftRoadmate() ? left_roadmate->getSpeed() : 0;
     }
 
+    double getLeftSDiff() {
+        if (hasLeftRoadmate()) {
+            return left_roadmate->getSDiff();
+        }
+        return large_s_value();
+    }
+
     bool isLeftRoadmateTooClose() {
         return hasLeftRoadmate() && left_roadmate->getSDiff() < too_close_distance();
     }
@@ -214,6 +221,13 @@ public:
 
     double getRightRoadmateSpeed() {
         return hasRightRoadmate() ? right_roadmate->getSpeed() : 0;
+    }
+
+    double getRightSDiff() {
+        if (hasRightRoadmate()) {
+            return right_roadmate->getSDiff();
+        }
+        return large_s_value();
     }
 
     bool isRightRoadmateTooClose() {
@@ -388,32 +402,55 @@ int main() {
 
             if (ra.isLaneRoadmateTooClose() && planner.isCenteredInLane()) {
                 int curr_lane = planner.getCurrentLane();
+
+                // if in middle lane, make an intelligent decision about which lane to change to
                 if (curr_lane == 1) {
                     double lane_rm_speed = ra.getLaneRoadmateSpeed();
                     double left_rm_speed = ra.getLeftRoadmateSpeed();
+                    double left_speed_diff = left_rm_speed - lane_rm_speed;
                     double right_rm_speed = ra.getRightRoadmateSpeed();
-                    bool isWorthChangingLeft = (left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) || ra.isLeftRoadmateReasonablyFarAhead();
-                    bool isWorthChangingRight = (right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) || ra.isRightRoadmateReasonablyFarAhead();
-                    if (isWorthChangingLeft && ra.isSafeToChangeLeft()) {
-                        planner.setGoalLane(0);
+                    double right_speed_diff = right_rm_speed - lane_rm_speed;
+                    bool is_worth_changing_left = (left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) || ra.isLeftRoadmateReasonablyFarAhead();
+                    bool is_worth_changing_right = (right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) || ra.isRightRoadmateReasonablyFarAhead();
+                    bool should_change_left = is_worth_changing_left && ra.isSafeToChangeLeft();
+                    bool should_change_right = is_worth_changing_right && ra.isSafeToChangeRight();
+                    // if both lane changes are allowable, choose the smarter one via cost function
+                    if (should_change_left && should_change_right) {
+                        double left_s_diff = ra.getLeftSDiff();
+                        double right_s_diff = ra.getRightSDiff();
+                        double left_cost = 1 / (left_s_diff + left_rm_speed);
+                        double right_cost = 1 / (right_s_diff + right_rm_speed);
+                        if (right_cost <= left_cost) {
+                            planner.setGoalLane(2);
+                        }
+                        else {
+                            planner.setGoalLane(0);
+                        }
                     }
-                    else if (isWorthChangingRight && ra.isSafeToChangeRight()) {
+                    else if (should_change_right) {
                         planner.setGoalLane(2);
                     }
+                    else if (should_change_left) {
+                        planner.setGoalLane(0);
+                    }
                 }
+
+                // if in left lane, all we can do is go right
                 if (curr_lane == 0) {
                     double lane_rm_speed = ra.getLaneRoadmateSpeed();
                     double right_rm_speed = ra.getRightRoadmateSpeed();
-                    bool isWorthChangingRight = (right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) || ra.isRightRoadmateReasonablyFarAhead();
-                    if (isWorthChangingRight && ra.isSafeToChangeRight()) {
+                    bool is_worth_changing_right = (right_rm_speed > lane_rm_speed && !ra.isRightRoadmateTooClose()) || ra.isRightRoadmateReasonablyFarAhead();
+                    if (is_worth_changing_right && ra.isSafeToChangeRight()) {
                         planner.setGoalLane(1);
                     }
                 }
+
+                // if in right lane, all we can do is go left
                 if (curr_lane == 2) {
                     double lane_rm_speed = ra.getLaneRoadmateSpeed();
                     double left_rm_speed = ra.getLeftRoadmateSpeed();
-                    bool isWorthChangingLeft = (left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) || ra.isLeftRoadmateReasonablyFarAhead();
-                    if (isWorthChangingLeft && ra.isSafeToChangeLeft()) {
+                    bool is_worth_changing_left = (left_rm_speed > lane_rm_speed && !ra.isLeftRoadmateTooClose()) || ra.isLeftRoadmateReasonablyFarAhead();
+                    if (is_worth_changing_left && ra.isSafeToChangeLeft()) {
                         planner.setGoalLane(1);
                     }
                 }
