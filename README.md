@@ -1,6 +1,47 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
-   
+
+## Reflection
+
+### Overview of Files
+
+* `main.cpp` - Entry point to all code. Contains the main loop that generates paths and determines when to change lanes.
+* `coord_utils.hpp` - Original utility code from Udacity. Moved out of `main.cpp` to reduce clutter.
+* `utils.hpp` - Various utility functions I wrote that were helpful in solving the problem.
+* `planner.hpp` - Planner class primarily used to persist goal lane state across main loop iterations. This class also contains various utilities related to the car's lane state and goal.
+* `roadmate_analyzer.hpp` - RoadmateAnalyzer class used to analyze other cars on the road. This class makes various queries available, which are useful in deciding when to change lanes.
+* `spline.h` - Spline library mentioned in README.
+
+### Path Generation
+
+Paths are generated via splines via the following process, heavily influenced by the project walkthrough video:
+
+1. The spline begins at the car's current point and uses past information to ensure the curve is tangent to the car's current trajectory.
+2. Waypoints are sampled at 30m intervals at a desired Frenet `d` offset as the rest of the spline points.
+3. The spline points are mapped from the global coordinate system to the car's coordinate system via `getCarXYPointFromGlobalXYPoint`.
+4. A target velocity is obtained via `getNextAcceleratedSpeed`, which examines the car's current speed, the speed of the closest car in front, whether the car in front is "too close," and if the car is changing lanes.
+5. Given the spline, a target point along the spline, and a target speed, a factor `N` is generated. The target point is the "goal," and a linear estimation of the distance to this point is used in generating `N`.
+6. `N` is used to generate individual points that the car will visit. After a point is generated, I also update the speed via `getNextAcceleratedSpeed`, which determines if the car should accelerate.
+
+The process described above provides an automatic way to follow the road, so long as the `d` coordinate of the desired lane is provided. If `d` is updated, the spline will provide a smooth pathway to the new lane.
+
+The key to implementing lane changing is to determine when to change the goal `d` coordinate and what value it should be. Lane changing (i.e., choosing a new `d`) is performed via the following process:
+
+1. The car will always remain in its lane unless there is a slow car in front of it. The `RoadmateAnalyzer.isLaneRoadmateTooClose` method is used to check if the car in front is too close.
+2. I also check if the car is centered in the current lane; if it is not; this is a sign that the car is performing a lane change, and so the goal should not be updated again. This check is to prevent the car from oscillating between lanes when stuck behind multiple cars.
+3. If it is determined that it might be worth changing lanes, I then run through a series of checks based on the current lane and the positions and speeds of nearby cars to determine if a lane change should actually be performed. When the car is in the center lane, a simple cost function is used to determine if there is a best lane to merge into.
+4. If it is determined that it is definitely worth changing lanes, the Planner sets the new goal lane. The target `d` is determined based on the goal lane and the path generation code automatically uses this value to generate the appropriate path.
+
+### Room for Improvement
+
+Ways I could have made this even better include:
+
+* Analyzing the speed of cars behind the car. Currently I only analyze the positions of cars behind the current car, meaning the car is cautious about changing lanes.
+* Analyzing the lane 2 lanes over to determine if a double lane change is worth it. Currently I only analyze adjacent lanes, so there are occasions when the car gets stuck in an edge lane because of slow cars in the current and center lane, even if the other edge lane is open.
+* Further optimizing the path generation to even more smoothly handle lane changes.
+
+## Udacity's Original README Below
+
 ### Simulator. You can download the Term3 Simulator BETA which contains the Path Planning Project from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
 
 In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 50 m/s^3.
